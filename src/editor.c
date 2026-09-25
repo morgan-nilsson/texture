@@ -221,7 +221,7 @@ void initBuffer(struct Editor* E, int screen) {
 }
 
 void initEditor(struct Editor* E) {
-    E->logger = initLogger("out.log");
+    E->logger = initLogger("build/out.log");
     for (int i = SCREEN_MIN; i <= SCREEN_MAX; i++){
         initBuffer(E, i);
     }
