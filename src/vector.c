@@ -1,112 +1,140 @@
-#include "../include/vector.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
+#include "../include/vector.h"
+
+#define VECTOR_INITIAL_CAPACITY 4
 #define VECTOR_GROWTH_FACTOR 2
 
-void vector_push(struct vector* self, void* data);
-void* vector_pop(struct vector* self);
-void* vector_get(struct vector* self, int index);
+static unsigned char *vector_element(struct vector *restrict self, size_t index) {
+    return self->data + index * self->element_size;
+}
 
-struct vector* vector_init_size(struct vector* self, int element_size, int initSize) {
-    if (initSize <= 0) return NULL;
-    if (element_size <= 0) return  NULL;
+int vector_init(struct vector *restrict self, size_t element_size) {
+    return vector_init_size(self, element_size, VECTOR_INITIAL_CAPACITY);
+}
+
+int vector_init_size(struct vector *restrict self, size_t element_size, size_t initSize) {
     self->element_size = element_size;
-    self->max_elements = initSize;
-    self->data = malloc(element_size*initSize);
-    if (self->data == NULL) {
-        free(self);
-        return NULL;
-    }
     self->num_elements = 0;
-    self->status = OK;
-    self->push = &vector_push;
-    self->pop = &vector_pop;
-    self->get = &vector_get;
-    return self;
+    self->max_elements = 0;
+    self->data = NULL;
+
+    if (element_size == 0) {
+        return -1; // Can't store zero sized elements
+    }
+    if (initSize == 0) {
+        initSize = 1; // Growth multiplies the capacity so it can't start at 0
+    }
+    if (initSize > SIZE_MAX / element_size) {
+        return -1; // Allocation size would overflow
+    }
+
+    self->data = malloc(initSize * element_size);
+    if (self->data == NULL) {
+        return -1; // Memory allocation failed
+    }
+    self->max_elements = initSize;
+    return 0; // Success
 }
 
-struct vector* vector_init(struct vector* self, int element_size) {
-    return vector_init_size(self, element_size, 30);
+int vector_reserve(struct vector *restrict self, size_t min_capacity) {
+    if (min_capacity <= self->max_elements) {
+        return 0; // No need to resize
+    }
+
+    size_t new_capacity = self->max_elements ? self->max_elements : 1;
+    while (new_capacity < min_capacity) {
+        if (new_capacity > SIZE_MAX / VECTOR_GROWTH_FACTOR) {
+            new_capacity = min_capacity;
+            break;
+        }
+        new_capacity *= VECTOR_GROWTH_FACTOR;
+    }
+    if (new_capacity > SIZE_MAX / self->element_size) {
+        return -1; // Allocation size would overflow
+    }
+
+    unsigned char *new_data = realloc(self->data, new_capacity * self->element_size);
+    if (new_data == NULL) {
+        return -1; // Memory allocation failed
+    }
+
+    self->data = new_data;
+    self->max_elements = new_capacity;
+    return 0; // Success
 }
 
-// will return NULL for bad resize values
-void vector_resize_n(struct vector* self, int newSize) {
-    self->status = UNKNOWN;
-    if (newSize <= 0 || newSize < self->num_elements) {
-        self->status = FAILED;
-    }
-    self->max_elements = newSize;
-    void* newData = malloc(self->element_size * newSize);
-    if (newData == NULL) {
-        self->status = FAILED;
-    }
-    memcpy(newData, self->data, self->element_size * self->num_elements);
+int vector_free(struct vector *restrict self) {
     free(self->data);
-    self->data = newData;
-    self->status = OK;
+    self->data = NULL;
+    self->num_elements = 0;
+    self->max_elements = 0;
+    return 0;
 }
 
-void vector_resize(struct vector* self) {
-    vector_resize_n(self, self->max_elements * VECTOR_GROWTH_FACTOR);
-}
-
-void vector_term(struct vector* self) {
-    free(self->data);
-    free(self);
-}
-
-void vector_term_ptrs(struct vector* self) {
-    for (int i = 0; i < self->num_elements; i++) {
-        free(vector_get(self, i));
+int vector_set_checked(struct vector *restrict self, size_t index, const void *data) {
+    if (index >= self->num_elements) {
+        return -1; // Index out of bounds
     }
-    vector_term(self);
+
+    vector_set_unchecked(self, index, data);
+    return 0; // Success
 }
 
-// dont add 2 different types to my vector
-void vector_push(struct vector* self, void* data) {
-    if (self->num_elements + 1 == self->max_elements) {
-        vector_resize(self);
+void vector_set_unchecked(struct vector *restrict self, size_t index, const void *data) {
+    // memmove so setting an element to itself is fine
+    memmove(vector_element(self, index), data, self->element_size);
+}
+
+int vector_push(struct vector *restrict self, const void *data) {
+    if (self->num_elements >= self->max_elements) {
+        uintptr_t src = (uintptr_t)data;
+        uintptr_t start = (uintptr_t)self->data;
+        int inside = self->data != NULL
+            && src >= start
+            && src < start + self->num_elements * self->element_size;
+        size_t offset = inside ? (size_t)(src - start) : 0;
+
+        if (vector_reserve(self, self->num_elements + 1) != 0) {
+            return -1; // Memory allocation failed
+        }
+        if (inside) {
+            data = self->data + offset;
+        }
     }
-    if (self->status != OK) {
-        return;
-    }
-    self->data[self->num_elements] = data;
+
+    memcpy(vector_element(self, self->num_elements), data, self->element_size);
     self->num_elements++;
+    return 0; // Success
 }
 
-void* vector_pop(struct vector* self) {
-    if (self == NULL) return NULL;
-    if (self->num_elements == 0) return NULL;
+void *vector_get_checked(struct vector *restrict self, size_t index) {
+    if (index >= self->num_elements) {
+        return NULL; // Index out of bounds
+    }
+
+    return vector_element(self, index);
+}
+
+void *vector_get_unchecked(struct vector *restrict self, size_t index) {
+    return vector_element(self, index);
+}
+
+void *vector_pop(struct vector *restrict self) {
+    if (self->num_elements == 0) {
+        return NULL; // Vector is empty
+    }
+
     self->num_elements--;
-    return self->data[self->num_elements+1];
+    return vector_element(self, self->num_elements);
 }
 
-// length is arr length
-// size is the element size
-void vector_add_data(struct vector* self, void** data, int dataLength) {
-    for (int i = 0; i < dataLength; i++) {
-        vector_push(self, data[self->element_size*i]);
-        if (self->status != OK) return;
+void *vector_peek(struct vector *restrict self) {
+    if (self->num_elements == 0) {
+        return NULL; // Vector is empty
     }
-}
 
-// not complete needs a map of used values
-// or you confuse the size of the vector
-void vector_set(struct vector* self, void* data, int idx) {
-    if (self == NULL) return;
-    if (idx < 0) return;
-    if (data == NULL) return;
-    if (self->max_elements <= idx) {
-        vector_resize_n(self, idx+1);
-    }
-    memcpy(self->data[idx], data, self->element_size);
-}
-
-void* vector_get(struct vector* self, int index) {
-    if (index > self->num_elements || index < 0) {
-        return NULL;
-    }
-    return self->data[index];
+    return vector_element(self, self->num_elements - 1);
 }

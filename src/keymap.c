@@ -64,51 +64,49 @@ Map command_keymap[] = {
 };
 #define COMMAND_LENGTH sizeof(command_keymap) / sizeof(command_keymap[0])
 
-struct vector* normal_mode_keymap_vector;
-struct vector* insert_mode_keymap_vector;
-struct vector* visual_mode_keymap_vector;
-struct vector* command_mode_keymap_vector;
+struct vector normal_mode_keymap_vector;
+struct vector insert_mode_keymap_vector;
+struct vector visual_mode_keymap_vector;
+struct vector command_mode_keymap_vector;
 
 struct vector* currKeymap_vector;
 
-void initKeymaps() {
-    normal_mode_keymap_vector = vector_init(malloc(sizeof(struct vector)), sizeof(Map));
-    insert_mode_keymap_vector = vector_init(malloc(sizeof(struct vector)), sizeof(Map));
-    visual_mode_keymap_vector = vector_init(malloc(sizeof(struct vector)), sizeof(Map));
-    command_mode_keymap_vector = vector_init(malloc(sizeof(struct vector)), sizeof(Map));
+static void loadKeymap(struct vector* vec, Map* keymap, size_t length) {
+    // free first so calling initKeymaps again doesn't leak
+    vector_free(vec);
+    if (vector_init_size(vec, sizeof(Map), length) != 0) {
+        terminate("keymap vector init failed");
+    }
+    for (size_t i = 0; i < length; i++) {
+        vector_push(vec, &keymap[i]);
+    }
+}
 
-    for (int i = 0; i < NORMAL_LENGTH; i++) {
-        normal_mode_keymap_vector->push(normal_mode_keymap_vector, &normal_keymap[i]);
-    }
-    for (int i = 0; i < INSERT_LENGTH; i++) {
-        insert_mode_keymap_vector->push(insert_mode_keymap_vector, &insert_keymap[i]);
-    }
-    for (int i = 0; i < VISUAL_LENGTH; i++) {
-        visual_mode_keymap_vector->push(visual_mode_keymap_vector, &visual_keymap[i]);
-    }
-    for (int i = 0; i < COMMAND_LENGTH; i++) {
-        command_mode_keymap_vector->push(command_mode_keymap_vector, &command_keymap[i]);
-    }
+void initKeymaps() {
+    loadKeymap(&normal_mode_keymap_vector, normal_keymap, NORMAL_LENGTH);
+    loadKeymap(&insert_mode_keymap_vector, insert_keymap, INSERT_LENGTH);
+    loadKeymap(&visual_mode_keymap_vector, visual_keymap, VISUAL_LENGTH);
+    loadKeymap(&command_mode_keymap_vector, command_keymap, COMMAND_LENGTH);
 }
 
 EditorAction getEditorActionFromKey(EditorMode mode, const char* key) {
     switch (mode) {
         case EDITOR_NORMAL_MODE:
-            currKeymap_vector = normal_mode_keymap_vector;
+            currKeymap_vector = &normal_mode_keymap_vector;
             break;
         case EDITOR_INSERT_MODE:
-            currKeymap_vector = insert_mode_keymap_vector;
+            currKeymap_vector = &insert_mode_keymap_vector;
             break;
         case EDITOR_VISUAL_MODE:
-            currKeymap_vector = visual_mode_keymap_vector;
+            currKeymap_vector = &visual_mode_keymap_vector;
             break;
         case EDITOR_COMMAND_MODE:
-            currKeymap_vector = command_mode_keymap_vector;
+            currKeymap_vector = &command_mode_keymap_vector;
             break;
     }
 
-    for (int i = 0; i < currKeymap_vector->num_elements; i++) {
-        Map* map = (Map *)currKeymap_vector->get(currKeymap_vector, i);
+    for (size_t i = 0; i < currKeymap_vector->num_elements; i++) {
+        Map* map = (Map *)vector_get_unchecked(currKeymap_vector, i);
         if (strcmp(key, map->key) == 0) return map->action;
         if (memcmp(key, map->key, min(strlen(key), strlen(map->key))) == 0) return map->action;
     }
