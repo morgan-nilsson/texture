@@ -4,3 +4,4 @@ Extends the kilo "Build Your Own Text Editor" tutorial with vi-style modal editi
 
 Bugs:
 Currently exiting a mode can refuse and eventually cause a crash (likely a mem issue)
+changing modes doesn't work

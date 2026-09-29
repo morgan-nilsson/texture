@@ -14,4 +14,7 @@ test: tests/*.c src/assert.c $(LIBS)
 clean:
 	rm -f $(BUILD_DIR)/texture $(BUILD_DIR)/test_runner
 
+run: $(BUILD_DIR)/texture
+	./$(BUILD_DIR)/texture
+
 .PHONY: test clean

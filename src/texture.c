@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include "../include/dict.h"
 #include "../include/utils.h"
@@ -26,25 +27,12 @@
 #include "../include/logger.h"
 #include "../include/highlight.h"
 
-#define lambda(return_type, function_body) \
-({ \
-      return_type __fn__ function_body \
-          __fn__; \
-})
-// int (*max)(int, int) = lambda (int, (int x, int y) { return x > y ? x : y; });
-// max(4, 5); // Example
-
-/** DEFINES**/
-#define true 1
-#define false 0
-
 /* prototypes */
 void editorSetStatusMessage(const char *fmt, ...);
 char *editorPrompt(char *prompt, void (*callback)(char *, int));
 void editorAppendActionBuffer(char c);
 
-// global var that is the default settings of terminal
-
+// global editor instance
 struct Editor E;
 
 
@@ -245,10 +233,10 @@ char* editorPrompt(char *prompt, void (*callback)(char *, int)){
     buffer[0] = '\0';
 
     while (true){
-        int c = editorReadKey();
-        editorAppendActionBuffer(c);
         editorSetStatusMessage(prompt, buffer);
         editorRefreshScreen(&E);
+        int c = editorReadKey();
+        editorAppendActionBuffer(c);
 
         if(c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE){
             if(bufferLength != 0){
@@ -363,7 +351,7 @@ void editorPreformEditorAction(EditorAction action, const char* input) {
         case ACTION_UNKOWN: return;
         case ACTION_IGNORE: return;
         case ACTION_GET_INPUT:
-            s = editorPrompt("Command :", NULL);
+            s = editorPrompt("Command :%s", NULL);
             E.logger->add(E.logger, "Prompt value: |%s|", s);
             EditorAction act = getEditorActionFromKey(EDITOR_COMMAND_MODE, s);
             E.logger->add(E.logger, "Editor action enum: |%d|", act);
