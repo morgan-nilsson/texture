@@ -90,46 +90,47 @@ void editorInsertRow(struct Editor* E, int at, char* s, size_t length, struct Ed
 }
 
 void editorMoveCursor(int key, struct EditorBuffer* buf){
-    struct EditorBuffer e = *buf;
-    EditorRow* row = (e.cy >= e.displayLength) ? NULL : &e.row[e.cy];
+    // work on the real buffer, a copy would throw the movement away
+    struct EditorBuffer* e = buf;
+    EditorRow* row = (e->cy >= e->displayLength) ? NULL : &e->row[e->cy];
     
     // update the cursor position based on the key inputs
     switch (key)
     {
         case ARROW_LEFT:
-            if (e.cx != 0){
-                e.cx--;
-            } else if(e.cy > 0){
-                e.cy--;
-                e.cx = e.row[e.cy].size;
+            if (e->cx != 0){
+                e->cx--;
+            } else if(e->cy > 0){
+                e->cy--;
+                e->cx = e->row[e->cy].size;
             }
             break;
         case ARROW_RIGHT:
-            if (row && e.cx < row->size){
-                e.cx++;
+            if (row && e->cx < row->size){
+                e->cx++;
             // if go right on a the end of line
-            } else if(row && e.cx == row->size){
-                e.cy++;
-                e.cx = 0;
+            } else if(row && e->cx == row->size){
+                e->cy++;
+                e->cx = 0;
             }
             break;
         case ARROW_UP:
-            if (e.cy != 0){
-                e.cy--;
+            if (e->cy != 0){
+                e->cy--;
             }
             break;
         case ARROW_DOWN:
-            if (e.cy < e.displayLength){
-                e.cy++;
+            if (e->cy < e->displayLength){
+                e->cy++;
             }
             break;
     }
 
     // snap cursor to the end of line
-    row = (e.cy >= e.displayLength) ? NULL : &e.row[e.cy];
+    row = (e->cy >= e->displayLength) ? NULL : &e->row[e->cy];
     int rowLength = row ? row->size : 0;
-    if (e.cx > rowLength){
-        e.cx = rowLength;
+    if (e->cx > rowLength){
+        e->cx = rowLength;
     }
 }
 

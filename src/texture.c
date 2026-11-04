@@ -30,7 +30,7 @@
 /* prototypes */
 void editorSetStatusMessage(const char *fmt, ...);
 char *editorPrompt(char *prompt, void (*callback)(char *, int));
-void editorAppendActionBuffer(char c);
+void editorAppendActionBuffer(int c);
 
 // global editor instance
 struct Editor E;
@@ -336,12 +336,32 @@ void editorSwitchScreen(int diff){
     E.currBuffer = &E.editors[E.screenNumber];
 }
 
-void editorAppendActionBuffer(char c) {
-    int i = strlen(E.editors[E.screenNumber].actionBuffer);
-    if (i == 40) return;
-    E.editors[E.screenNumber].actionBuffer[i] = c;
-    E.editors[E.screenNumber].actionBuffer[i + 1] = '\0';
+void editorAppendActionBuffer(int c) {
+    char* actionBuffer = E.editors[E.screenNumber].actionBuffer;
+    size_t i = strlen(actionBuffer);
+    // special keys take 2 bytes, leave room for them and the terminator
+    if (i + 3 > sizeof(E.editors[E.screenNumber].actionBuffer)) return;
+    // a 0 byte would end the string early
+    if (c == 0) return;
 
+    if (c >= ARROW_LEFT) {
+        actionBuffer[i++] = KEY_SPECIAL_PREFIX;
+        actionBuffer[i++] = (char)(c - ARROW_LEFT + 1);
+    } else {
+        actionBuffer[i++] = (char)c;
+    }
+    actionBuffer[i] = '\0';
+}
+
+// map a cursor movement action to the arrow key editorMoveCursor expects
+static int editorActionToArrowKey(EditorAction action) {
+    switch (action) {
+        case ACTION_MOVE_CURSOR_RIGHT: return ARROW_RIGHT;
+        case ACTION_MOVE_CURSOR_LEFT: return ARROW_LEFT;
+        case ACTION_MOVE_CURSOR_UP: return ARROW_UP;
+        case ACTION_MOVE_CURSOR_DOWN: return ARROW_DOWN;
+        default: return 0;
+    }
 }
 
 
@@ -352,10 +372,14 @@ void editorPreformEditorAction(EditorAction action, const char* input) {
         case ACTION_IGNORE: return;
         case ACTION_GET_INPUT:
             s = editorPrompt("Command :%s", NULL);
+            // NULL when the prompt was cancelled with ESC
+            if (s == NULL) break;
             E.logger->add(E.logger, "Prompt value: |%s|", s);
             EditorAction act = getEditorActionFromKey(EDITOR_COMMAND_MODE, s);
+            free(s);
             E.logger->add(E.logger, "Editor action enum: |%d|", act);
             editorPreformEditorAction(act, NULL);
+            break;
         case ACTION_EXECUTE_DIR:
             handleCommand(input);
             break;
@@ -372,7 +396,7 @@ void editorPreformEditorAction(EditorAction action, const char* input) {
         case ACTION_MOVE_CURSOR_LEFT:
         case ACTION_MOVE_CURSOR_UP:
         case ACTION_MOVE_CURSOR_DOWN:
-            editorMoveCursor(action, &E.editors[E.screenNumber]);
+            editorMoveCursor(editorActionToArrowKey(action), &E.editors[E.screenNumber]);
             break;
         case ACTION_FS_SAVE_FILE:
             editorSave();
@@ -433,11 +457,18 @@ void editorProcessKeyPress(void) {
     EditorAction action = getEditorActionFromKey(mode, actionBuf);
 
     if (mode == EDITOR_INSERT_MODE && action == ACTION_UNKOWN) {
-        editorInsertChar(&E, c, &E.editors[E.screenNumber]);
+        // only insert text, unbound special keys and control chars would corrupt the row
+        if (c == '\t' || (c < ARROW_LEFT && !iscntrl((unsigned char)c))) {
+            editorInsertChar(&E, c, &E.editors[E.screenNumber]);
+        }
     } else if(action != ACTION_UNKOWN){
         editorPreformEditorAction(action, actionBuf);
     }
-    E.editors[E.screenNumber].actionBuffer[0] = '\0';
+
+    // keep the keys of a partial binding like the first d of dd
+    if (action != ACTION_WAIT) {
+        E.editors[E.screenNumber].actionBuffer[0] = '\0';
+    }
     editorSetStatusMessage("%s", actionBuf);
 }
 

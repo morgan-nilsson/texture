@@ -1,5 +1,4 @@
 replace char* with a struct alternative that supports alternate encodings
-replace the keymaps with a union type im getting intersects with the shift combos like big H and big d
 add ncurses rendering and split it off
 add a config system
 figure out and setup lsp system
@@ -10,3 +9,7 @@ firgure out and add an add-ons system
 further split the project to allow for modularity for things such as ncurses
 fix the status bar not showing the input values
 Need to split apart the rendering of the status bar and the action buffer
+fix handleCommand: `str = str + s[i]` does pointer arithmetic instead of building a string (leftover from c++ port)
+fix crash: ACTION_GET_INPUT passes NULL input on, handleCommand derefs it if a command maps to ACTION_EXECUTE_DIR
+status bar prints raw special key bytes (0xFF + index) from the action buffer
+add tests for keymap prefix / ACTION_WAIT matching and the arrow key bindings

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "../include/keymap.h"
 #include "../include/editor.h"
 #include "../include/vector.h"
@@ -23,11 +24,11 @@ Map normal_keymap[] = {
     {":", ACTION_GET_INPUT, "Get for input"},
     {"i", ACTION_ENTER_INSERT_MODE, "Enter insert mode"},
     {"v", ACTION_ENTER_VISUAL_MODE, "Enter visual mode"},
-    {STRING(ARROW_RIGHT), ACTION_MOVE_CURSOR_RIGHT, "Move cursor right"},
-    {STRING(ARROW_LEFT), ACTION_MOVE_CURSOR_LEFT, "Move cursor left"},
-    {STRING(ARROW_UP), ACTION_MOVE_CURSOR_UP, "Move cursor up"},
-    {STRING(ARROW_DOWN), ACTION_MOVE_CURSOR_DOWN, "Move cursor down"},
-    {STRING(CTRL_KEY('s')), ACTION_FS_SAVE_FILE, "Save the current buffer"},
+    {KEY_ARROW_RIGHT, ACTION_MOVE_CURSOR_RIGHT, "Move cursor right"},
+    {KEY_ARROW_LEFT, ACTION_MOVE_CURSOR_LEFT, "Move cursor left"},
+    {KEY_ARROW_UP, ACTION_MOVE_CURSOR_UP, "Move cursor up"},
+    {KEY_ARROW_DOWN, ACTION_MOVE_CURSOR_DOWN, "Move cursor down"},
+    {KEY_CTRL_S, ACTION_FS_SAVE_FILE, "Save the current buffer"},
     {"d", ACTION_WAIT, "Wait for next enter"},
     {"dd", ACTION_REMOVE_LINE, "Delete the current line"},
     {"l", ACTION_MOVE_CURSOR_RIGHT, "Move cursor right"},
@@ -45,15 +46,15 @@ Map visual_keymap[] = {
 Map insert_keymap[] = {
     {"\x1b", ACTION_ENTER_NORMAL_MODE, "Exit insert mode"},
     {"\r", ACTION_INSERT_NEWLINE, "Insert Newline"},
-    {STRING(HOME_KEY), ACTION_MOVE_HOME_KEY, "Move with the home key"},
-    {STRING(END_KEY), ACTION_MOVE_END_KEY, "Move with the end key"},
-    {STRING(BACKSPACE), ACTION_REMOVE_BACKSPACE, "Backspace"},
-    {STRING(CTRL_KEY('h')), ACTION_REMOVE_BACKSPACE, "Backspace"},
-    {STRING(DEL_KEY), ACTION_REMOVE_DEL_KEY, "Del"},
-    {STRING(ARROW_RIGHT), ACTION_MOVE_CURSOR_RIGHT, "Move cursor right"},
-    {STRING(ARROW_LEFT), ACTION_MOVE_CURSOR_LEFT, "Move cursor left"},
-    {STRING(ARROW_UP), ACTION_MOVE_CURSOR_UP, "Move cursor up"},
-    {STRING(ARROW_DOWN), ACTION_MOVE_CURSOR_DOWN, "Move cursor down"},
+    {KEY_HOME, ACTION_MOVE_HOME_KEY, "Move with the home key"},
+    {KEY_END, ACTION_MOVE_END_KEY, "Move with the end key"},
+    {KEY_BACKSPACE, ACTION_REMOVE_BACKSPACE, "Backspace"},
+    {KEY_CTRL_H, ACTION_REMOVE_BACKSPACE, "Backspace"},
+    {KEY_DEL, ACTION_REMOVE_DEL_KEY, "Del"},
+    {KEY_ARROW_RIGHT, ACTION_MOVE_CURSOR_RIGHT, "Move cursor right"},
+    {KEY_ARROW_LEFT, ACTION_MOVE_CURSOR_LEFT, "Move cursor left"},
+    {KEY_ARROW_UP, ACTION_MOVE_CURSOR_UP, "Move cursor up"},
+    {KEY_ARROW_DOWN, ACTION_MOVE_CURSOR_DOWN, "Move cursor down"},
 };
 #define INSERT_LENGTH sizeof(insert_keymap) / sizeof(insert_keymap[0])
 
@@ -105,11 +106,17 @@ EditorAction getEditorActionFromKey(EditorMode mode, const char* key) {
             break;
     }
 
+    // NULL comes from a cancelled prompt, an empty key would prefix match everything
+    if (key == NULL || key[0] == '\0') return ACTION_UNKOWN;
+
+    size_t keyLength = strlen(key);
+    bool isPrefix = false;
     for (size_t i = 0; i < currKeymap_vector->num_elements; i++) {
         Map* map = (Map *)vector_get_unchecked(currKeymap_vector, i);
         if (strcmp(key, map->key) == 0) return map->action;
-        if (memcmp(key, map->key, min(strlen(key), strlen(map->key))) == 0) return map->action;
+        // key is the start of a longer binding, wait for the rest of it
+        if (strncmp(key, map->key, keyLength) == 0) isPrefix = true;
     }
 
-    return ACTION_UNKOWN;
+    return isPrefix ? ACTION_WAIT : ACTION_UNKOWN;
 }

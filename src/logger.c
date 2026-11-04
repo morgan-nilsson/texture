@@ -4,6 +4,8 @@
 #include "../include/logger.h"
 
 void logger_add(struct Logger* logger, const char* format, ...) {
+    // logging must never take the editor down, drop the message if the log didn't open
+    if (logger->file == NULL) return;
     va_list args;
     va_start(args, format);
     vfprintf(logger->file, format, args);
@@ -13,6 +15,8 @@ void logger_add(struct Logger* logger, const char* format, ...) {
 }
 
 void logger_warn(struct Logger* logger, const char* format, ...) {
+    // logging must never take the editor down, drop the message if the log didn't open
+    if (logger->file == NULL) return;
     va_list args;
     va_start(args, format);
     fprintf(logger->file, "|WARNING| ");
@@ -23,6 +27,8 @@ void logger_warn(struct Logger* logger, const char* format, ...) {
 }
 
 void logger_error(struct Logger* logger, const char* format, ...) {
+    // logging must never take the editor down, drop the message if the log didn't open
+    if (logger->file == NULL) return;
     va_list args;
     va_start(args, format);
     fprintf(logger->file, "|ERROR| ");
@@ -33,8 +39,10 @@ void logger_error(struct Logger* logger, const char* format, ...) {
 }
 
 void closeLogger(struct Logger* logger) {
-    fflush(logger->file);
-    fclose(logger->file);
+    if (logger->file != NULL) {
+        fflush(logger->file);
+        fclose(logger->file);
+    }
     free(logger);
 }
 

@@ -110,7 +110,7 @@ int editorReadKey(void) {
                 }
             }
         // if the value of the first char is a 0 also denoting a special charater
-        } else if(seq[0] == '0'){
+        } else if(seq[0] == 'O'){
             switch (seq[1]){
                 case 'H': return HOME_KEY;
                 case 'F': return END_KEY;
